@@ -1,3 +1,11 @@
+# ============================================================
+# ROOT — Monorepo: frontend (Flutter) + backend (Node.js)
+# ============================================================
+
+# ========================
+# FRONTEND (Flutter/Dart)
+# ========================
+
 # Miscellaneous
 *.class
 *.log
@@ -12,34 +20,73 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code (uncomment jika tidak ingin di-track)
 #.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter/Dart/Pub
 **/doc/api/
 **/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
 
-# Symbolication related
+# Symbolication & Obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Android build artifacts
+frontend/android/app/debug
+frontend/android/app/profile
+frontend/android/app/release
+
+# ========================
+# BACKEND (Node.js)
+# ========================
+
+# Dependencies
+backend/node_modules/
+
+# Environment variables (JANGAN pernah di-commit!)
+backend/.env
+backend/.env.local
+backend/.env.*.local
+
+# Logs
+backend/logs/
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Build output
+backend/dist/
+backend/build/
+
+# Runtime data
+backend/pids/
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+
+# Coverage
+backend/coverage/
+
+# Cache
+backend/.npm
+backend/.eslintcache
+
+# ========================
+# UMUM
+# ========================
+.DS_Store
+Thumbs.db
