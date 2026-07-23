@@ -17,9 +17,8 @@ app.use(express.urlencoded({ extended: true }));
 // Cek Koneksi Database
 async function testDBConnection() {
     try {
-        const connection = await db.getConnection();
-        console.log('✅ Berhasil terhubung ke database MySQL RunNotPace!');
-        connection.release();
+        await db.query('SELECT 1');
+        console.log('✅ Berhasil terhubung ke database Supabase (PostgreSQL)!');
     } catch (error) {
         console.error('❌ Gagal terhubung ke database:', error.message);
     }
@@ -38,21 +37,27 @@ app.post('/api/auth/register', async (req, res) => {
     const { nama, email, password } = req.body;
     try {
         // Cek apakah email sudah pernah didaftarkan
-        const [existingUser] = await db.query('SELECT * FROM tabel_users WHERE email = ?', [email]);
-        if (existingUser.length > 0) {
+        const existingUser = await db.query(
+            'SELECT * FROM tabel_users WHERE email = $1',
+            [email]
+        );
+        if (existingUser.rows.length > 0) {
             return res.status(400).json({ message: 'Email sudah terdaftar!' });
         }
 
         // Enkripsi password sebelum disimpan ke database
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Masukkan data pengguna baru ke MySQL
-        const [result] = await db.query(
-            'INSERT INTO tabel_users (nama, email, password) VALUES (?, ?, ?)',
+        // Masukkan data pengguna baru — RETURNING untuk mendapatkan id hasil insert
+        const result = await db.query(
+            'INSERT INTO tabel_users (nama, email, password) VALUES ($1, $2, $3) RETURNING id_user',
             [nama, email, hashedPassword]
         );
 
-        res.status(201).json({ message: 'Registrasi berhasil!', id_user: result.insertId });
+        res.status(201).json({
+            message: 'Registrasi berhasil!',
+            id_user: result.rows[0].id_user,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
@@ -66,12 +71,15 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         // Cari pengguna berdasarkan email di database
-        const [users] = await db.query('SELECT * FROM tabel_users WHERE email = ?', [email]);
-        if (users.length === 0) {
+        const users = await db.query(
+            'SELECT * FROM tabel_users WHERE email = $1',
+            [email]
+        );
+        if (users.rows.length === 0) {
             return res.status(404).json({ message: 'Akun tidak ditemukan!' });
         }
 
-        const user = users[0];
+        const user = users.rows[0];
 
         // Cocokkan password yang diinput dengan password terenkripsi di database
         const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -79,17 +87,17 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(401).json({ message: 'Password salah!' });
         }
 
-        // Jika benar, buat Token JWT (Tiket Masuk) yang berlaku selama 7 hari
+        // Buat Token JWT yang berlaku selama 7 hari
         const token = jwt.sign(
-            { id_user: user.id_user, email: user.email }, 
-            process.env.JWT_SECRET, 
-            { expiresIn: '7d' } 
+            { id_user: user.id_user, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
         );
 
         res.json({
             message: 'Login berhasil!',
             token: token,
-            user: { id_user: user.id_user, nama: user.nama, email: user.email }
+            user: { id_user: user.id_user, nama: user.nama, email: user.email },
         });
     } catch (error) {
         console.error(error);
@@ -101,23 +109,17 @@ app.post('/api/auth/login', async (req, res) => {
 // MIDDLEWARE: VERIFIKASI TOKEN JWT
 // ==========================================
 const verifyToken = (req, res, next) => {
-    // Ambil token dari header request
     const token = req.headers['authorization'];
-    
+
     if (!token) {
         return res.status(403).json({ message: 'Akses ditolak! Token tidak tersedia.' });
     }
 
     try {
-        // Pisahkan kata "Bearer" dari token (format standar)
         const tokenBody = token.split(' ')[1] || token;
-        
-        // Verifikasi keaslian token
         const decoded = jwt.verify(tokenBody, process.env.JWT_SECRET);
-        
-        // Simpan data user (seperti id_user) ke dalam request untuk dipakai di endpoint
-        req.user = decoded; 
-        next(); // Lanjut ke proses berikutnya
+        req.user = decoded;
+        next();
     } catch (error) {
         return res.status(401).json({ message: 'Token tidak valid atau sudah kadaluarsa!' });
     }
@@ -126,25 +128,21 @@ const verifyToken = (req, res, next) => {
 // ==========================================
 // ENDPOINT CEK RUTE LARI (MAPBOX DIRECTIONS)
 // ==========================================
-// Endpoint dilindungi JWT. Profil walking dipakai agar jalur lebih sesuai
-// untuk aktivitas lari dibandingkan profil kendaraan.
 app.post('/api/maps/get-route', verifyToken, async (req, res) => {
     const { origin, destination } = req.body;
 
-    // Format koordinat yang diterima:
-    // { "latitude": -6.2000, "longitude": 106.8166 }
     const isValidCoordinate = (point) => {
         if (!point || typeof point !== 'object') return false;
-
         const latitude = Number(point.latitude);
         const longitude = Number(point.longitude);
-
-        return Number.isFinite(latitude)
-            && Number.isFinite(longitude)
-            && latitude >= -90
-            && latitude <= 90
-            && longitude >= -180
-            && longitude <= 180;
+        return (
+            Number.isFinite(latitude) &&
+            Number.isFinite(longitude) &&
+            latitude >= -90 &&
+            latitude <= 90 &&
+            longitude >= -180 &&
+            longitude <= 180
+        );
     };
 
     if (!isValidCoordinate(origin) || !isValidCoordinate(destination)) {
@@ -165,7 +163,6 @@ app.post('/api/maps/get-route', verifyToken, async (req, res) => {
     }
 
     try {
-        // Mapbox memakai urutan longitude,latitude.
         const coordinates = [
             `${Number(origin.longitude)},${Number(origin.latitude)}`,
             `${Number(destination.longitude)},${Number(destination.latitude)}`,
@@ -231,17 +228,17 @@ app.post('/api/maps/get-route', verifyToken, async (req, res) => {
 // ==========================================
 app.post('/api/routes', verifyToken, async (req, res) => {
     const { nama_lokasi_start, nama_lokasi_finish, koordinat_jalur, total_jarak_km } = req.body;
-    // id_user didapatkan otomatis dari Token yang dikirim, jadi sangat aman!
-    const id_user = req.user.id_user; 
+    const id_user = req.user.id_user;
 
     try {
-        const [result] = await db.query(
-            'INSERT INTO tabel_routes (id_user, nama_lokasi_start, nama_lokasi_finish, koordinat_jalur, total_jarak_km) VALUES (?, ?, ?, ?, ?)',
+        const result = await db.query(
+            `INSERT INTO tabel_routes (id_user, nama_lokasi_start, nama_lokasi_finish, koordinat_jalur, total_jarak_km)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id_rute`,
             [id_user, nama_lokasi_start, nama_lokasi_finish, koordinat_jalur, total_jarak_km]
         );
-        res.status(201).json({ 
-            message: 'Rute lari berhasil disimpan!', 
-            id_rute: result.insertId 
+        res.status(201).json({
+            message: 'Rute lari berhasil disimpan!',
+            id_rute: result.rows[0].id_rute,
         });
     } catch (error) {
         console.error(error);
@@ -250,20 +247,24 @@ app.post('/api/routes', verifyToken, async (req, res) => {
 });
 
 // ==========================================
-// 5. ENDPOINT JURNAL LARI (RUN LOGS)
+// ENDPOINT JURNAL LARI (RUN LOGS)
 // ==========================================
 
-// A. Menyimpan riwayat lari baru (Selesai lari)
+// A. Menyimpan riwayat lari baru
 app.post('/api/logs', verifyToken, async (req, res) => {
     const { id_rute, durasi_menit, catatan_kondisi, tanggal_latihan } = req.body;
-    const id_user = req.user.id_user; // Dari token yang diamankan
+    const id_user = req.user.id_user;
 
     try {
-        const [result] = await db.query(
-            'INSERT INTO tabel_run_logs (id_user, id_rute, durasi_menit, catatan_kondisi, tanggal_latihan) VALUES (?, ?, ?, ?, ?)',
+        const result = await db.query(
+            `INSERT INTO tabel_run_logs (id_user, id_rute, durasi_menit, catatan_kondisi, tanggal_latihan)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id_log`,
             [id_user, id_rute, durasi_menit, catatan_kondisi, tanggal_latihan]
         );
-        res.status(201).json({ message: 'Jurnal lari berhasil dicatat!', id_log: result.insertId });
+        res.status(201).json({
+            message: 'Jurnal lari berhasil dicatat!',
+            id_log: result.rows[0].id_log,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal menyimpan jurnal lari.' });
@@ -275,55 +276,56 @@ app.get('/api/logs', verifyToken, async (req, res) => {
     const id_user = req.user.id_user;
 
     try {
-        // Menggabungkan (JOIN) tabel logs dan tabel routes agar kita bisa 
-        // melihat nama rute dan jarak km-nya sekaligus.
-        const [logs] = await db.query(`
-            SELECT l.*, r.nama_lokasi_start, r.nama_lokasi_finish, r.total_jarak_km 
-            FROM tabel_run_logs l 
-            JOIN tabel_routes r ON l.id_rute = r.id_rute 
-            WHERE l.id_user = ? 
-            ORDER BY l.tanggal_latihan DESC
-        `, [id_user]);
-        
-        res.json({ message: 'Berhasil mengambil riwayat lari', data: logs });
+        const logs = await db.query(
+            `SELECT l.*, r.nama_lokasi_start, r.nama_lokasi_finish, r.total_jarak_km
+             FROM tabel_run_logs l
+             JOIN tabel_routes r ON l.id_rute = r.id_rute
+             WHERE l.id_user = $1
+             ORDER BY l.tanggal_latihan DESC`,
+            [id_user]
+        );
+        res.json({ message: 'Berhasil mengambil riwayat lari', data: logs.rows });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil riwayat lari.' });
     }
 });
 
-
 // ==========================================
 // ENDPOINT EVENT LARI (EVENT PLANNER)
 // ==========================================
 
-// A. Menambahkan rencana event lari ke kalender
+// A. Menambahkan rencana event lari
 app.post('/api/events', verifyToken, async (req, res) => {
     const { nama_event, tanggal_event, lokasi_event, biaya_pendaftaran, status_persiapan } = req.body;
     const id_user = req.user.id_user;
 
     try {
-        const [result] = await db.query(
-            'INSERT INTO tabel_events (id_user, nama_event, tanggal_event, lokasi_event, biaya_pendaftaran, status_persiapan) VALUES (?, ?, ?, ?, ?, ?)',
+        const result = await db.query(
+            `INSERT INTO tabel_events (id_user, nama_event, tanggal_event, lokasi_event, biaya_pendaftaran, status_persiapan)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_event`,
             [id_user, nama_event, tanggal_event, lokasi_event, biaya_pendaftaran, status_persiapan || 'Wishlist']
         );
-        res.status(201).json({ message: 'Event lari berhasil ditambahkan!', id_event: result.insertId });
+        res.status(201).json({
+            message: 'Event lari berhasil ditambahkan!',
+            id_event: result.rows[0].id_event,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal menyimpan event lari.' });
     }
 });
 
-// B. Melihat daftar event yang akan diikuti
+// B. Melihat daftar event
 app.get('/api/events', verifyToken, async (req, res) => {
     const id_user = req.user.id_user;
 
     try {
-        const [events] = await db.query(
-            'SELECT * FROM tabel_events WHERE id_user = ? ORDER BY tanggal_event ASC',
+        const events = await db.query(
+            'SELECT * FROM tabel_events WHERE id_user = $1 ORDER BY tanggal_event ASC',
             [id_user]
         );
-        res.json({ message: 'Berhasil mengambil daftar event', data: events });
+        res.json({ message: 'Berhasil mengambil daftar event', data: events.rows });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil daftar event.' });

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.3:3000/api';
+  static const String baseUrl = 'http://localhost:3000/api';
 
   // Perbaikan tipe data Future di bawah ini:
   static Future<Map<String, dynamic>> login(
