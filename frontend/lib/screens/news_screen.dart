@@ -392,7 +392,7 @@ class _NewsScreenState extends State<NewsScreen>
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                           itemCount: _articles.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 14),
                           itemBuilder: (context, index) {
                             final article = _articles[index];
@@ -440,7 +440,7 @@ class _NewsScreenState extends State<NewsScreen>
                   height: 160,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (_, _, _) =>
                       _buildImagePlaceholder(accentColor),
                 ),
               )

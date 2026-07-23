@@ -73,18 +73,20 @@ class _HistoryScreenState extends State<HistoryScreen>
           _isLoading = false;
         });
       } else {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _isLoading = false;
             _errorMessage = 'Gagal memuat data riwayat.';
           });
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Tidak dapat terhubung ke server.';
         });
+      }
     }
   }
 

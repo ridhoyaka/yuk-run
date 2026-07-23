@@ -305,9 +305,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Transform(
                     transform: Matrix4.identity()
                       ..setEntry(3, 2, 0.002)
-                      ..translate(delta * -150, 0.0)
+                      ..translateByDouble(delta * -150, 0.0, 0.0, 1.0)
                       ..rotateZ(delta * 0.2)
-                      ..scale((1 - delta.abs() * 0.4).clamp(0.6, 1.0)),
+                      ..scaleByDouble(
+                        (1 - delta.abs() * 0.4).clamp(0.6, 1.0),
+                        (1 - delta.abs() * 0.4).clamp(0.6, 1.0),
+                        (1 - delta.abs() * 0.4).clamp(0.6, 1.0),
+                        1.0,
+                      ),
                     alignment: Alignment.center,
                     child: Opacity(
                       opacity: (1 - delta.abs() * 1.2).clamp(0.0, 1.0),

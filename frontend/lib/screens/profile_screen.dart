@@ -369,7 +369,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: accentColor,
+        activeThumbColor: accentColor,
         inactiveThumbColor: Colors.white38,
         inactiveTrackColor: Colors.white12,
       ),
