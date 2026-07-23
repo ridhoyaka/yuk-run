@@ -4,7 +4,9 @@ import 'login_screen.dart';
 import '../widgets/hover_button.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String userName;
+
+  const ProfileScreen({super.key, required this.userName});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -16,6 +18,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
+  final _storage = const FlutterSecureStorage();
+  String _userEmail = '';
+
   @override
   void initState() {
     super.initState();
@@ -23,14 +28,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero)
         .animate(
           CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
         );
-
     _animController.forward();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final email = await _storage.read(key: 'user_email') ?? '';
+    if (mounted) setState(() => _userEmail = email);
   }
 
   @override
@@ -40,14 +49,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _handleLogout(BuildContext context) async {
-    const storage = FlutterSecureStorage();
-    await storage.delete(key: 'jwt_token');
-    await storage.delete(key: 'user_name');
-
+    await _storage.delete(key: 'jwt_token');
+    await _storage.delete(key: 'user_name');
+    await _storage.delete(key: 'user_email');
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -55,77 +63,479 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Keluar Akun',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin keluar dari aplikasi RunNotPace?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
           ),
-          title: const Text(
-            'Keluar Akun',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _handleLogout(context);
+            },
+            child: const Text(
+              'Keluar',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-          content: const Text(
-            'Apakah Anda yakin ingin keluar dari aplikasi RunNotPace?',
-            style: TextStyle(color: Colors.white70),
+        ],
+      ),
+    );
+  }
+
+  void _showEditProfileDialog(BuildContext context) {
+    const accentColor = Color(0xFF00FF66);
+    final nameController = TextEditingController(text: widget.userName);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          actions: [
-            HoverButton(
-              builder: (context, progress) => TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                foregroundColor: Color.lerp(Colors.white54, Colors.white, progress),
-                backgroundColor: Colors.transparent,
-                side: progress > 0.01
-                    ? BorderSide(
-                        color: Colors.white.withValues(alpha: progress),
-                        width: 2.0,
-                      )
-                    : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              child: const Text('Batal'),
-            ),
-            ),
-            HoverButton(
-              builder: (context, progress) => TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _handleLogout(context);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Color.lerp(Colors.redAccent, const Color(0xFF00FF66), progress),
-                backgroundColor: Colors.transparent,
-                side: progress > 0.01
-                    ? BorderSide(
-                        color: Colors.white.withValues(alpha: progress),
-                        width: 2.0,
-                      )
-                    : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Keluar',
+              const SizedBox(height: 20),
+              const Text(
+                'Edit Profil',
                 style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color.lerp(Colors.redAccent, const Color(0xFF00FF66), progress),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Nama',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  prefixIcon: const Icon(
+                    Icons.person_outline,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.white12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: accentColor),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await _storage.write(
+                      key: 'user_name',
+                      value: nameController.text,
+                    );
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Profil berhasil diperbarui',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: accentColor,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'SIMPAN PERUBAHAN',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNotifDialog(BuildContext context) {
+    const accentColor = Color(0xFF00FF66);
+    bool pushEnabled = true;
+    bool emailEnabled = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Pengaturan Notifikasi',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildSwitchTile(
+                'Notifikasi Push',
+                'Pengingat latihan & info rute',
+                pushEnabled,
+                accentColor,
+                (v) => setSheetState(() => pushEnabled = v),
+              ),
+              const Divider(color: Colors.white12),
+              _buildSwitchTile(
+                'Notifikasi Email',
+                'Ringkasan aktivitas mingguan',
+                emailEnabled,
+                accentColor,
+                (v) => setSheetState(() => emailEnabled = v),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Pengaturan notifikasi disimpan',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: accentColor,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'SIMPAN',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchTile(
+    String title,
+    String subtitle,
+    bool value,
+    Color accentColor,
+    ValueChanged<bool> onChanged,
+  ) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: accentColor,
+        inactiveThumbColor: Colors.white38,
+        inactiveTrackColor: Colors.white12,
+      ),
+    );
+  }
+
+  void _showSecurityDialog(BuildContext context) {
+    const accentColor = Color(0xFF00FF66);
+    final oldPassController = TextEditingController();
+    final newPassController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Keamanan & Sandi',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildPassField(
+                oldPassController,
+                'Password Lama',
+                Icons.lock_outline,
+              ),
+              const SizedBox(height: 14),
+              _buildPassField(
+                newPassController,
+                'Password Baru',
+                Icons.lock_reset_rounded,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Permintaan ganti sandi dikirim ke server',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: accentColor,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'GANTI SANDI',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPassField(
+    TextEditingController ctrl,
+    String label,
+    IconData icon,
+  ) {
+    const accentColor = Color(0xFF00FF66);
+    return TextField(
+      controller: ctrl,
+      obscureText: true,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        prefixIcon: Icon(icon, color: Colors.white54, size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.white12),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: accentColor),
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            const Text(
+              'Pusat Bantuan',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+            const SizedBox(height: 16),
+            _buildHelpItem(
+              Icons.question_answer_outlined,
+              'FAQ',
+              'Pertanyaan yang sering ditanyakan',
+            ),
+            const Divider(color: Colors.white12),
+            _buildHelpItem(
+              Icons.email_outlined,
+              'Hubungi Kami',
+              'support@runnotpace.app',
+            ),
+            const Divider(color: Colors.white12),
+            _buildHelpItem(
+              Icons.info_outline_rounded,
+              'Versi Aplikasi',
+              'RunNotPace v1.0.0',
+            ),
+            const SizedBox(height: 20),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHelpItem(IconData icon, String title, String subtitle) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: Colors.white54, size: 22),
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const accentColor = Color(0xFF00FF66); // Hijau Neon Awal
+    const accentColor = Color(0xFF00FF66);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -153,6 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                         const SizedBox(height: 20),
+                        // Kartu profil
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(24),
@@ -192,18 +603,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ),
                               ),
                               const SizedBox(height: 15),
-                              const Text(
-                                'Pelari RunNotPace',
-                                style: TextStyle(
+                              Text(
+                                widget.userName,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'pelari.aktif@runnotpace.com',
-                                style: TextStyle(
+                              Text(
+                                _userEmail.isNotEmpty
+                                    ? _userEmail
+                                    : 'runnotpace@app.com',
+                                style: const TextStyle(
                                   color: Colors.white54,
                                   fontSize: 13,
                                 ),
@@ -265,25 +678,25 @@ class _ProfileScreenState extends State<ProfileScreen>
                             _buildMenuTile(
                               Icons.person_outline_rounded,
                               'Edit Profil',
-                              () {},
+                              () => _showEditProfileDialog(context),
                             ),
                             const Divider(color: Colors.white12, height: 1),
                             _buildMenuTile(
                               Icons.notifications_outlined,
                               'Pengaturan Notifikasi',
-                              () {},
+                              () => _showNotifDialog(context),
                             ),
                             const Divider(color: Colors.white12, height: 1),
                             _buildMenuTile(
                               Icons.security_rounded,
                               'Keamanan & Sandi',
-                              () {},
+                              () => _showSecurityDialog(context),
                             ),
                             const Divider(color: Colors.white12, height: 1),
                             _buildMenuTile(
                               Icons.help_outline_rounded,
                               'Pusat Bantuan',
-                              () {},
+                              () => _showHelpDialog(context),
                             ),
                           ],
                         ),
@@ -294,36 +707,48 @@ class _ProfileScreenState extends State<ProfileScreen>
                         height: 52,
                         child: HoverButton(
                           builder: (context, progress) => OutlinedButton.icon(
-                          onPressed: () => _showLogoutDialog(context),
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                            onPressed: () => _showLogoutDialog(context),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              backgroundColor: Color.lerp(
+                                Colors.redAccent.withValues(alpha: 0.05),
+                                Colors.transparent,
+                                progress,
+                              ),
+                              side: BorderSide(
+                                color: Color.lerp(
+                                  Colors.redAccent.withValues(alpha: 0.5),
+                                  Colors.white,
+                                  progress,
+                                )!,
+                                width: 2.0,
+                              ),
                             ),
-                            backgroundColor: Color.lerp(
-                              Colors.redAccent.withValues(alpha: 0.05),
-                              Colors.transparent,
-                              progress,
-                            )!,
-                            side: BorderSide(
-                              color: Color.lerp(Colors.transparent, Colors.white, progress)!,
-                              width: 2.0,
+                            icon: Icon(
+                              Icons.logout_rounded,
+                              color: Color.lerp(
+                                Colors.redAccent,
+                                accentColor,
+                                progress,
+                              ),
+                              size: 20,
+                            ),
+                            label: Text(
+                              'KELUAR AKUN (LOGOUT)',
+                              style: TextStyle(
+                                color: Color.lerp(
+                                  Colors.redAccent,
+                                  accentColor,
+                                  progress,
+                                ),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                letterSpacing: 1,
+                              ),
                             ),
                           ),
-                          icon: Icon(
-                            Icons.logout_rounded,
-                            color: Color.lerp(Colors.redAccent, accentColor, progress),
-                            size: 20,
-                          ),
-                          label: Text(
-                            'KELUAR AKUN (LOGOUT)',
-                            style: TextStyle(
-                              color: Color.lerp(Colors.redAccent, accentColor, progress),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ),
                         ),
                       ),
                       const SizedBox(height: 100),
