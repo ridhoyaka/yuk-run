@@ -150,7 +150,12 @@ class _NavItem {
 // ============================================================
 // CUSTOM BOTTOM NAVIGATION BAR
 // ============================================================
-class _CustomNavBar extends StatefulWidget {
+//
+// Menggunakan satu indikator hijau yang bergerak secara horizontal.
+// Indikator tidak dibuat ulang pada setiap menu sehingga perpindahan
+// terlihat seperti bergeser, bukan berkedip.
+//
+class _CustomNavBar extends StatelessWidget {
   final int currentIndex;
   final List<_NavItem> items;
   final ValueChanged<int> onTap;
@@ -160,66 +165,6 @@ class _CustomNavBar extends StatefulWidget {
     required this.items,
     required this.onTap,
   });
-
-  @override
-  State<_CustomNavBar> createState() {
-    return _CustomNavBarState();
-  }
-}
-
-class _CustomNavBarState extends State<_CustomNavBar>
-    with TickerProviderStateMixin {
-  late final List<AnimationController> _controllers;
-  late final List<Animation<double>> _bubbleAnimations;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controllers = List.generate(widget.items.length, (index) {
-      return AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 350),
-      );
-    });
-
-    _bubbleAnimations = _controllers.map((controller) {
-      return Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
-      );
-    }).toList();
-
-    if (widget.currentIndex >= 0 && widget.currentIndex < _controllers.length) {
-      _controllers[widget.currentIndex].forward();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _CustomNavBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.currentIndex == widget.currentIndex) {
-      return;
-    }
-
-    if (oldWidget.currentIndex >= 0 &&
-        oldWidget.currentIndex < _controllers.length) {
-      _controllers[oldWidget.currentIndex].reverse();
-    }
-
-    if (widget.currentIndex >= 0 && widget.currentIndex < _controllers.length) {
-      _controllers[widget.currentIndex].forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
-    }
-
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -241,82 +186,125 @@ class _CustomNavBarState extends State<_CustomNavBar>
         top: false,
         child: SizedBox(
           height: 68,
-          child: Row(
-            children: List.generate(widget.items.length, (index) {
-              final item = widget.items[index];
-              final isSelected = widget.currentIndex == index;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / items.length;
 
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    widget.onTap(index);
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedBuilder(
-                    animation: _controllers[index],
-                    builder: (BuildContext context, Widget? child) {
-                      final progress = _bubbleAnimations[index].value;
+              // Menyesuaikan lebar indikator pada layar kecil.
+              final indicatorWidth = itemWidth >= 76 ? 68.0 : itemWidth - 8;
 
-                      final selectedColor = Color.lerp(
-                        Colors.white38,
-                        accentColor,
-                        progress,
-                      );
+              final indicatorLeft =
+                  (currentIndex * itemWidth) +
+                  ((itemWidth - indicatorWidth) / 2);
 
-                      return Center(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          width: 68,
-                          height: 57,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? accentColor.withValues(alpha: 0.18 * progress)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                            border: isSelected
-                                ? Border.all(
-                                    color: accentColor.withValues(
-                                      alpha: 0.4 * progress,
-                                    ),
-                                    width: 1.5,
-                                  )
-                                : null,
+              return Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  // ==================================================
+                  // INDIKATOR HIJAU YANG BERGESER
+                  // ==================================================
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 450),
+                    curve: Curves.easeInOutCubic,
+                    left: indicatorLeft,
+                    top: 5.5,
+                    width: indicatorWidth,
+                    height: 57,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: accentColor.withValues(alpha: 0.45),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentColor.withValues(alpha: 0.10),
+                            blurRadius: 12,
+                            spreadRadius: 1,
                           ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                item.icon,
-                                size: 22,
-                                color: isSelected
-                                    ? selectedColor
-                                    : Colors.white38,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                item.label,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? selectedColor
-                                      : Colors.white38,
-                                  letterSpacing: isSelected ? 0.2 : 0,
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ==================================================
+                  // DAFTAR MENU NAVIGASI
+                  // ==================================================
+                  Row(
+                    children: List.generate(items.length, (index) {
+                      final item = items[index];
+                      final isSelected = currentIndex == index;
+
+                      return Expanded(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => onTap(index),
+                            splashColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            overlayColor: WidgetStatePropertyAll<Color>(
+                              Colors.transparent,
+                            ),
+                            child: SizedBox(
+                              height: 68,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween<double>(
+                                  begin: 0,
+                                  end: isSelected ? 1 : 0,
                                 ),
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOutCubic,
+                                builder: (context, progress, child) {
+                                  final itemColor = Color.lerp(
+                                    Colors.white38,
+                                    accentColor,
+                                    progress,
+                                  )!;
+
+                                  final scale = 1 + (0.08 * progress);
+
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          item.icon,
+                                          size: 22,
+                                          color: itemColor,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          item.label,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                            color: itemColor,
+                                            letterSpacing: 0.2 * progress,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       );
-                    },
+                    }),
                   ),
-                ),
+                ],
               );
-            }),
+            },
           ),
         ),
       ),
