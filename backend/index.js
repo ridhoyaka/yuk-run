@@ -1263,6 +1263,18 @@ app.get("/api/news", async (req, res) => {
   }
 });
 
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Backend RunNotPace aktif",
+    environment: process.env.NODE_ENV || "development",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ==========================================
 // ENDPOINT TIDAK DITEMUKAN
 // ==========================================
