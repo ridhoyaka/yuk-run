@@ -58,19 +58,9 @@ class _NewsScreenState extends State<NewsScreen>
       _errorMessage = null;
     });
 
-    final queries = [
-      'running health',
-      'marathon fitness',
-      'jogging tips',
-      'healthy lifestyle sport',
-    ];
-    final query = queries[_selectedCategory % queries.length];
-
-    // Menggunakan GNews API (free plan, tidak perlu CORS proxy untuk mobile/desktop)
-    // Ganti API_KEY dengan key dari https://gnews.io
-    const apiKey = 'GNEWS_API_KEY';
-    final url =
-        'https://gnews.io/api/v4/search?q=${Uri.encodeComponent(query)}&lang=id&country=id&max=10&apikey=$apiKey';
+    // Kirim index kategori ke backend, query ditentukan di sisi server
+    const apiBase = 'http://localhost:3000/api';
+    final url = '$apiBase/news?category=$_selectedCategory';
 
     try {
       final response = await http
@@ -89,8 +79,16 @@ class _NewsScreenState extends State<NewsScreen>
             _isLoading = false;
           });
         }
+      } else if (response.statusCode == 429) {
+        if (mounted) {
+          setState(() {
+            _articles = _getFallbackArticles();
+            _isLoading = false;
+            _errorMessage =
+                'Batas harian API tercapai. Menampilkan berita tersimpan.';
+          });
+        }
       } else {
-        // Fallback ke data statis jika API gagal
         if (mounted) {
           setState(() {
             _articles = _getFallbackArticles();
@@ -99,7 +97,6 @@ class _NewsScreenState extends State<NewsScreen>
         }
       }
     } catch (e) {
-      // Fallback ke data statis jika tidak ada koneksi
       if (mounted) {
         setState(() {
           _articles = _getFallbackArticles();
@@ -116,55 +113,60 @@ class _NewsScreenState extends State<NewsScreen>
         'title': '5 Manfaat Lari Pagi yang Perlu Kamu Tahu',
         'description':
             'Lari pagi bukan sekadar olahraga. Ada banyak manfaat yang bisa kamu rasakan mulai dari meningkatkan mood hingga menjaga kesehatan jantung.',
-        'source': {'name': 'Health & Fitness'},
+        'source': {'name': 'Halodoc'},
         'publishedAt': '2026-07-20T06:00:00Z',
-        'url': 'https://www.halodoc.com',
+        'url':
+            'https://www.halodoc.com/artikel/manfaat-olahraga-lari-bagi-kesehatan',
         'image': null,
       },
       {
         'title': 'Tips Nutrisi Sebelum Maraton: Apa yang Harus Dimakan?',
         'description':
             'Asupan makanan yang tepat sebelum berlari jauh sangat menentukan performa dan daya tahan tubuh kamu selama lomba.',
-        'source': {'name': 'Sport Nutrition'},
+        'source': {'name': 'Alodokter'},
         'publishedAt': '2026-07-19T08:00:00Z',
-        'url': 'https://www.alodokter.com',
+        'url': 'https://www.alodokter.com/makanan-sebelum-olahraga',
         'image': null,
       },
       {
         'title': 'Cara Menghindari Cedera Lutut Saat Lari',
         'description':
             'Cedera lutut adalah keluhan paling umum para pelari. Simak cara pencegahannya agar latihan tetap konsisten.',
-        'source': {'name': 'RunnerWorld ID'},
+        'source': {'name': 'KlikDokter'},
         'publishedAt': '2026-07-18T07:30:00Z',
-        'url': 'https://www.klikdokter.com',
+        'url':
+            'https://www.klikdokter.com/olahraga/olahraga-lainnya/tips-mencegah-cedera-saat-lari',
         'image': null,
       },
       {
         'title': 'Berapa Jarak Ideal Lari untuk Pemula?',
         'description':
             'Bagi kamu yang baru mulai berlari, menentukan jarak yang tepat sangat penting agar tidak overtraining dan tetap termotivasi.',
-        'source': {'name': 'Fitness Indonesia'},
+        'source': {'name': 'Alodokter'},
         'publishedAt': '2026-07-17T09:00:00Z',
-        'url': 'https://www.alodokter.com',
+        'url': 'https://www.alodokter.com/olahraga-lari-bagi-pemula',
         'image': null,
       },
       {
         'title': 'Pentingnya Pemanasan Sebelum Mulai Berlari',
         'description':
             'Banyak pelari melewatkan pemanasan. Padahal rutinitas ini sangat penting untuk mencegah cedera dan meningkatkan performa.',
-        'source': {'name': 'Active Health'},
+        'source': {'name': 'Halodoc'},
         'publishedAt': '2026-07-16T06:45:00Z',
-        'url': 'https://www.halodoc.com',
+        'url':
+            'https://www.halodoc.com/artikel/gerakan-pemanasan-sebelum-olahraga',
         'image': null,
       },
     ];
   }
 
-  Future<void> _openArticle(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+  Future<void> _openArticle(String? url) async {
+    if (url == null || url.isEmpty) return;
+    try {
+      final uri = Uri.parse(url);
+      // platformDefault: buka di browser bawaan, works di Android, iOS, dan Web
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -413,7 +415,7 @@ class _NewsScreenState extends State<NewsScreen>
         (article['source'] as Map?)?['name'] as String? ??
         'Sumber tidak diketahui';
     final publishedAt = _formatDate(article['publishedAt'] as String?);
-    final url = article['url'] as String? ?? '';
+    final url = article['url'] as String?;
     final imageUrl = article['image'] as String?;
 
     return GestureDetector(

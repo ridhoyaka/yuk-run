@@ -73,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen>
 
         await _storage.write(key: 'jwt_token', value: token);
         await _storage.write(key: 'user_name', value: user.nama);
+        await _storage.write(key: 'user_email', value: user.email);
 
         if (!mounted) return;
 
@@ -226,30 +227,37 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               suffixIcon: HoverButton(
                                 builder: (context, progress) => IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Color.lerp(Colors.white54, Colors.white, progress),
-                                  size: 20,
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: Color.lerp(
+                                      Colors.white54,
+                                      Colors.white,
+                                      progress,
+                                    ),
+                                    size: 20,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shape: progress > 0.01
+                                        ? CircleBorder(
+                                            side: BorderSide(
+                                              color: Colors.white.withValues(
+                                                alpha: progress,
+                                              ),
+                                              width: 2.0,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  onPressed: () {
+                                    setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
+                                    );
+                                  },
                                 ),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shape: progress > 0.01
-                                      ? CircleBorder(
-                                          side: BorderSide(
-                                            color: Colors.white.withValues(alpha: progress),
-                                            width: 2.0,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                onPressed: () {
-                                  setState(
-                                    () => _obscurePassword = !_obscurePassword,
-                                  );
-                                },
-                              ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderSide: const BorderSide(
@@ -267,17 +275,23 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
 
                           const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: HoverButton(
-                                builder: (context, progress) => TextButton(
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: HoverButton(
+                              builder: (context, progress) => TextButton(
                                 onPressed: () {},
                                 style: TextButton.styleFrom(
-                                  foregroundColor: Color.lerp(Colors.white54, Colors.white, progress),
+                                  foregroundColor: Color.lerp(
+                                    Colors.white54,
+                                    Colors.white,
+                                    progress,
+                                  ),
                                   backgroundColor: Colors.transparent,
                                   side: progress > 0.01
                                       ? BorderSide(
-                                          color: Colors.white.withValues(alpha: progress),
+                                          color: Colors.white.withValues(
+                                            alpha: progress,
+                                          ),
                                           width: 2.0,
                                         )
                                       : null,
@@ -290,8 +304,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   style: TextStyle(fontSize: 12),
                                 ),
                               ),
-                              ),
                             ),
+                          ),
                         ],
                       ),
                     ),
@@ -302,43 +316,55 @@ class _LoginScreenState extends State<LoginScreen>
                     SizedBox(
                       height: 55,
                       child: HoverButton(
-                         builder: (context, progress) => ElevatedButton(
-                         onPressed: _isLoading ? null : _handleLogin,
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: Color.lerp(
-                             accentColor,
-                             Colors.transparent,
-                             progress,
-                           ),
-                           foregroundColor: Color.lerp(Colors.black, accentColor, progress),
-                           elevation: 0,
-                           side: BorderSide(
-                             color: Color.lerp(Colors.transparent, Colors.white, progress)!,
-                             width: 2.0,
-                           ),
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(16),
-                           ),
-                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.black,
-                                  strokeWidth: 2.5,
+                        builder: (context, progress) => ElevatedButton(
+                          onPressed: _isLoading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color.lerp(
+                              accentColor,
+                              Colors.transparent,
+                              progress,
+                            ),
+                            foregroundColor: Color.lerp(
+                              Colors.black,
+                              accentColor,
+                              progress,
+                            ),
+                            elevation: 0,
+                            side: BorderSide(
+                              color: Color.lerp(
+                                Colors.transparent,
+                                Colors.white,
+                                progress,
+                              )!,
+                              width: 2.0,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.black,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Text(
+                                  'MASUK',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                    color: Color.lerp(
+                                      Colors.black,
+                                      accentColor,
+                                      progress,
+                                    ),
+                                  ),
                                 ),
-                              )
-                            : Text(
-                                'MASUK',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                  color: Color.lerp(Colors.black, accentColor, progress),
-                                ),
-                              ),
-                      ),
+                        ),
                       ),
                     ),
 
@@ -354,67 +380,80 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         HoverButton(
                           builder: (context, progress) => TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder:
-                                    (context, animation, secondaryAnimation) =>
-                                        const RegisterScreen(),
-                                transitionsBuilder:
-                                    (
-                                      context,
-                                      animation,
-                                      secondaryAnimation,
-                                      child,
-                                    ) {
-                                      var slideTransition =
-                                          Tween<Offset>(
-                                            begin: const Offset(1.0, 0.0),
-                                            end: Offset.zero,
-                                          ).animate(
-                                            CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeInOutCubic,
-                                            ),
-                                          );
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                      ) => const RegisterScreen(),
+                                  transitionsBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                        child,
+                                      ) {
+                                        var slideTransition =
+                                            Tween<Offset>(
+                                              begin: const Offset(1.0, 0.0),
+                                              end: Offset.zero,
+                                            ).animate(
+                                              CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeInOutCubic,
+                                              ),
+                                            );
 
-                                      return SlideTransition(
-                                        position: slideTransition,
-                                        child: FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                      );
-                                    },
-                                transitionDuration: const Duration(
-                                  milliseconds: 400,
+                                        return SlideTransition(
+                                          position: slideTransition,
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          ),
+                                        );
+                                      },
+                                  transitionDuration: const Duration(
+                                    milliseconds: 400,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Color.lerp(
+                                accentColor,
+                                Colors.white,
+                                progress,
+                              ),
+                              backgroundColor: Colors.transparent,
+                              side: progress > 0.01
+                                  ? BorderSide(
+                                      color: Colors.white.withValues(
+                                        alpha: progress,
+                                      ),
+                                      width: 2.0,
+                                    )
+                                  : null,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              'Daftar Sekarang',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color.lerp(
+                                  accentColor,
+                                  Colors.white,
+                                  progress,
                                 ),
                               ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: Color.lerp(accentColor, Colors.white, progress),
-                            backgroundColor: Colors.transparent,
-                            side: progress > 0.01
-                                ? BorderSide(
-                                    color: Colors.white.withValues(alpha: progress),
-                                    width: 2.0,
-                                  )
-                                : null,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: Text(
-                            'Daftar Sekarang',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Color.lerp(accentColor, Colors.white, progress),
-                            ),
-                          ),
-                        ),
                         ),
                       ],
                     ),

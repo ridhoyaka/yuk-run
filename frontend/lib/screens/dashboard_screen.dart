@@ -1,12 +1,61 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import '../widgets/hover_button.dart';
+import '../services/api_service.dart';
 import 'main_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final String userName;
-
   const DashboardScreen({super.key, required this.userName});
 
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _storage = const FlutterSecureStorage();
+
+  double _totalJarak = 0;
+  String _durasiLabel = '0m';
+  bool _statsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWeeklyStats();
+  }
+
+  Future<void> _fetchWeeklyStats() async {
+    if (mounted) setState(() => _statsLoading = true);
+    try {
+      final token = await _storage.read(key: 'jwt_token');
+      if (token == null) return;
+
+      final response = await http
+          .get(
+            Uri.parse('${ApiService.baseUrl}/stats/weekly'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _totalJarak = (data['total_jarak_km'] as num).toDouble();
+          _durasiLabel = data['durasi_label'] as String? ?? '0m';
+          _statsLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _statsLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _statsLoading = false);
+    }
+  }
+
+  // Tab index: 0=Riwayat, 1=Peta, 2=Dashboard, 3=Berita, 4=Profil
   void _navigateToTab(BuildContext context, int tabIndex) {
     final state = context.findAncestorStateOfType<MainScreenState>();
     state?.navigateTo(tabIndex);
@@ -37,7 +86,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        userName,
+                        widget.userName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 22,
@@ -107,8 +156,7 @@ class DashboardScreen extends StatelessWidget {
                       height: 45,
                       child: HoverButton(
                         builder: (context, progress) => ElevatedButton.icon(
-                          // Navigasi ke tab Map (index 1)
-                          onPressed: () => _navigateToTab(context, 1),
+                          onPressed: () => _navigateToTab(context, 1), // Peta
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color.lerp(
                               accentColor,
@@ -164,14 +212,37 @@ class DashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // Statistik
-              const Text(
-                'Statistik Minggu Ini',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              // Statistik Minggu Ini
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Statistik Minggu Ini',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_statsLoading)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: accentColor,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: _fetchWeeklyStats,
+                      child: const Icon(
+                        Icons.refresh_rounded,
+                        color: Colors.white38,
+                        size: 18,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 12),
               Row(
@@ -179,7 +250,9 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       'Total Jarak',
-                      '12.5 km',
+                      _statsLoading
+                          ? '...'
+                          : '${_totalJarak.toStringAsFixed(1)} km',
                       Icons.route_rounded,
                       accentColor,
                     ),
@@ -188,7 +261,7 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       'Waktu Tempuh',
-                      '1j 15m',
+                      _statsLoading ? '...' : _durasiLabel,
                       Icons.timer_outlined,
                       Colors.blueAccent,
                     ),
@@ -212,8 +285,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   HoverButton(
                     builder: (context, progress) => TextButton(
-                      // Navigasi ke tab History (index 2)
-                      onPressed: () => _navigateToTab(context, 2),
+                      onPressed: () => _navigateToTab(context, 0), // Riwayat
                       style: TextButton.styleFrom(
                         foregroundColor: Color.lerp(
                           accentColor,
@@ -251,7 +323,7 @@ class DashboardScreen extends StatelessWidget {
                 'Jalur Hijau Sudirman',
                 '6.8 km • Sudirman',
                 Icons.park_rounded,
-                const Color(0xFF00FF66),
+                accentColor,
               ),
               const SizedBox(height: 12),
             ],
@@ -305,8 +377,7 @@ class DashboardScreen extends StatelessWidget {
     Color accentColor,
   ) {
     return GestureDetector(
-      // Tap pada kartu rute → navigasi ke tab Map
-      onTap: () => _navigateToTab(context, 1),
+      onTap: () => _navigateToTab(context, 1), // Peta
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

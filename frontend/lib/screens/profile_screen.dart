@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'login_screen.dart';
 import '../widgets/hover_button.dart';
+import '../services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -20,6 +23,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   final _storage = const FlutterSecureStorage();
   String _userEmail = '';
+
+  // Stats real dari database
+  double _totalJarak = 0;
+  int _totalSesi = 0;
+  int _totalPencapaian = 0;
+  bool _statsLoading = true;
 
   @override
   void initState() {
@@ -40,6 +49,36 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _loadUserData() async {
     final email = await _storage.read(key: 'user_email') ?? '';
     if (mounted) setState(() => _userEmail = email);
+    await _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    if (mounted) setState(() => _statsLoading = true);
+    try {
+      final token = await _storage.read(key: 'jwt_token');
+      if (token == null) return;
+
+      final response = await http
+          .get(
+            Uri.parse('${ApiService.baseUrl}/profile/stats'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _totalJarak = (data['total_jarak_km'] as num).toDouble();
+          _totalSesi = data['total_sesi'] as int;
+          _totalPencapaian = data['total_pencapaian'] as int;
+          _statsLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _statsLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _statsLoading = false);
+    }
   }
 
   @override
@@ -622,25 +661,48 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: [
-                                  _buildProfileStat('Jarak Total', '142.5 km'),
-                                  Container(
-                                    width: 1,
-                                    height: 25,
-                                    color: Colors.white12,
-                                  ),
-                                  _buildProfileStat('Sesi Lari', '28 Sesi'),
-                                  Container(
-                                    width: 1,
-                                    height: 25,
-                                    color: Colors.white12,
-                                  ),
-                                  _buildProfileStat('Pencapaian', '12 Badge'),
-                                ],
-                              ),
+                              _statsLoading
+                                  ? const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Color(0xFF00FF66),
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      children: [
+                                        _buildProfileStat(
+                                          'Jarak Total',
+                                          '${_totalJarak.toStringAsFixed(1)} km',
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 25,
+                                          color: Colors.white12,
+                                        ),
+                                        _buildProfileStat(
+                                          'Sesi Lari',
+                                          '$_totalSesi Sesi',
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 25,
+                                          color: Colors.white12,
+                                        ),
+                                        _buildProfileStat(
+                                          'Pencapaian',
+                                          '$_totalPencapaian Event',
+                                        ),
+                                      ],
+                                    ),
                             ],
                           ),
                         ),

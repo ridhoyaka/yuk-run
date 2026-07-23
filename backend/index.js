@@ -9,6 +9,14 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// ==========================================
+// IN-MEMORY CACHE UNTUK GNEWS
+// Cache per kategori, TTL 30 menit
+// Menghemat kuota API (max 100 req/hari di free plan)
+// ==========================================
+const newsCache = new Map(); // key: categoryIndex, value: { data, fetchedAt }
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 menit
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -329,6 +337,144 @@ app.get('/api/events', verifyToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil daftar event.' });
+    }
+});
+
+// ==========================================
+// ENDPOINT STATISTIK MINGGU INI (DASHBOARD)
+// ==========================================
+app.get('/api/stats/weekly', verifyToken, async (req, res) => {
+    const id_user = req.user.id_user;
+
+    try {
+        // Ambil data 7 hari terakhir
+        const result = await db.query(
+            `SELECT 
+                COALESCE(SUM(r.total_jarak_km), 0) AS total_jarak,
+                COALESCE(SUM(l.durasi_menit), 0) AS total_durasi_menit,
+                COUNT(l.id_log) AS total_sesi
+             FROM tabel_run_logs l
+             JOIN tabel_routes r ON l.id_rute = r.id_rute
+             WHERE l.id_user = $1
+               AND l.tanggal_latihan >= CURRENT_DATE - INTERVAL '7 days'`,
+            [id_user]
+        );
+
+        const row = result.rows[0];
+        const totalMenit = parseInt(row.total_durasi_menit) || 0;
+        const jam = Math.floor(totalMenit / 60);
+        const menit = totalMenit % 60;
+
+        res.json({
+            total_jarak_km: parseFloat(row.total_jarak) || 0,
+            total_durasi_menit: totalMenit,
+            durasi_label: jam > 0 ? `${jam}j ${menit}m` : `${menit}m`,
+            total_sesi: parseInt(row.total_sesi) || 0,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Gagal mengambil statistik mingguan.' });
+    }
+});
+
+// ==========================================
+// ENDPOINT STATISTIK PROFIL PENGGUNA
+// ==========================================
+app.get('/api/profile/stats', verifyToken, async (req, res) => {
+    const id_user = req.user.id_user;
+
+    try {
+        // Total jarak dari semua rute yang pernah dilari
+        const jarakResult = await db.query(
+            `SELECT COALESCE(SUM(r.total_jarak_km), 0) AS total_jarak
+             FROM tabel_run_logs l
+             JOIN tabel_routes r ON l.id_rute = r.id_rute
+             WHERE l.id_user = $1`,
+            [id_user]
+        );
+
+        // Total sesi lari
+        const sesiResult = await db.query(
+            `SELECT COUNT(*) AS total_sesi FROM tabel_run_logs WHERE id_user = $1`,
+            [id_user]
+        );
+
+        // Total event yang diikuti (sebagai proxy "pencapaian")
+        const eventResult = await db.query(
+            `SELECT COUNT(*) AS total_event FROM tabel_events WHERE id_user = $1`,
+            [id_user]
+        );
+
+        res.json({
+            total_jarak_km: parseFloat(jarakResult.rows[0].total_jarak) || 0,
+            total_sesi: parseInt(sesiResult.rows[0].total_sesi) || 0,
+            total_pencapaian: parseInt(eventResult.rows[0].total_event) || 0,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Gagal mengambil statistik profil.' });
+    }
+});
+
+// ==========================================
+// ENDPOINT PROXY BERITA (GNEWS)
+// ==========================================
+// Mapping kategori dari Flutter ke query bahasa Indonesia
+const categoryQueries = {
+  '0': 'lari kesehatan olahraga',
+  '1': 'tips lari maraton',
+  '2': 'kesehatan tubuh kebugaran',
+  '3': 'nutrisi olahraga pelari',
+  '4': 'kebugaran fitness gym',
+};
+
+app.get('/api/news', async (req, res) => {
+    const categoryIndex = req.query.category || '0';
+    const customQuery = req.query.q;
+    const query = customQuery || categoryQueries[categoryIndex] || 'lari kesehatan';
+    const apiKey = process.env.GNEWS_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ message: 'GNEWS_API_KEY belum dikonfigurasi.' });
+    }
+
+    // Cek cache dulu sebelum request ke GNews
+    const cacheKey = customQuery || categoryIndex;
+    const cached = newsCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && (now - cached.fetchedAt) < CACHE_TTL_MS) {
+        const ageMinutes = Math.floor((now - cached.fetchedAt) / 60000);
+        console.log(`📦 Cache hit [kategori: ${cacheKey}] — umur cache: ${ageMinutes} menit`);
+        return res.json(cached.data);
+    }
+
+    try {
+        // lang=id untuk berita bahasa Indonesia, country=id untuk sumber Indonesia
+        const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=id&country=id&max=10&sortby=publishedAt&apikey=${apiKey}`;
+        const response = await axios.get(url, { timeout: 10000 });
+
+        // Simpan ke cache
+        newsCache.set(cacheKey, { data: response.data, fetchedAt: now });
+        console.log(`🌐 GNews fetched [kategori: ${cacheKey}] — disimpan ke cache 30 menit`);
+
+        return res.json(response.data);
+    } catch (error) {
+        const status = error.response?.status;
+        const message = error.response?.data?.errors?.[0] || error.message;
+        console.error('GNews error:', { status, message });
+
+        // Kalau rate limit (429) tapi ada cache lama → kembalikan cache lama daripada error
+        if (status === 429 && cached) {
+            console.warn('⚠️  Rate limited, mengembalikan cache lama...');
+            return res.json(cached.data);
+        }
+
+        return res.status(status && status < 500 ? status : 502).json({
+            message: status === 429
+                ? 'Batas request harian GNews tercapai. Coba lagi nanti.'
+                : message || 'Gagal mengambil berita dari GNews.',
+        });
     }
 });
 
