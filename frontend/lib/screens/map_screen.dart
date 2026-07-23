@@ -38,6 +38,12 @@ class _MapScreenState extends State<MapScreen>
     defaultValue: '',
   );
 
+  bool get _hasValidMapboxToken {
+    final token = mapboxToken.trim();
+
+    return token.isNotEmpty && token.startsWith('pk.');
+  }
+
   final MapController _mapController = MapController();
 
   LatLng _currentLocation = const LatLng(-6.1751, 106.8272);
@@ -51,6 +57,10 @@ class _MapScreenState extends State<MapScreen>
   Timer? _debounce;
 
   List<dynamic> _searchResults = [];
+
+  bool _isSearchingLocation = false;
+
+  String? _searchError;
 
   LatLng? _destinationLocation;
 
@@ -108,14 +118,24 @@ class _MapScreenState extends State<MapScreen>
   // ============================================================
 
   void _initializeScreen() {
-    // GPS tetap berjalan untuk memperbarui posisi pengguna.
+    debugPrint('MAPBOX_ACCESS_TOKEN tersedia: $_hasValidMapboxToken');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hasValidMapboxToken) return;
+
+      _showMessage(
+        'Token Mapbox frontend belum dimuat. '
+        'Jalankan Flutter memakai env.local.json.',
+        isError: true,
+      );
+    });
+
     unawaited(_initializeLocation());
 
     final savedRoute = widget.initialSavedRoute;
 
     if (savedRoute == null) return;
 
-    // Tunggu FlutterMap terpasang sebelum menyesuaikan kamera.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -212,33 +232,64 @@ class _MapScreenState extends State<MapScreen>
   // ============================================================
 
   void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) {
-      _debounce!.cancel();
-    }
+    _debounce?.cancel();
 
     final cleanedQuery = query.trim();
 
     if (cleanedQuery.isEmpty) {
+      if (!mounted) return;
+
       setState(() {
         _searchResults = [];
+        _isSearchingLocation = false;
+        _searchError = null;
       });
 
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 250), () async {
-      final url = Uri.https(
-        'api.mapbox.com',
-        '/geocoding/v5/mapbox.places/$cleanedQuery.json',
-        {
-          'access_token': mapboxToken,
-          'country': 'id',
-          'proximity':
-              '${_currentLocation.longitude},'
-              '${_currentLocation.latitude}',
-          'limit': '5',
-        },
-      );
+    // Flutter tidak membaca backend/.env secara langsung.
+    // MAPBOX_ACCESS_TOKEN harus diberikan melalui --dart-define
+    // atau --dart-define-from-file ketika Flutter dijalankan.
+    if (!_hasValidMapboxToken) {
+      if (!mounted) return;
+
+      setState(() {
+        _searchResults = [];
+        _isSearchingLocation = false;
+        _searchError =
+            'Token Mapbox frontend belum dimuat. '
+            'Jalankan aplikasi memakai env.local.json.';
+      });
+
+      return;
+    }
+
+    setState(() {
+      _searchResults = [];
+      _isSearchingLocation = true;
+      _searchError = null;
+    });
+
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final encodedQuery = Uri.encodeComponent(cleanedQuery);
+
+      final url =
+          Uri.parse(
+            'https://api.mapbox.com/geocoding/v5/'
+            'mapbox.places/$encodedQuery.json',
+          ).replace(
+            queryParameters: {
+              'access_token': mapboxToken.trim(),
+              'country': 'id',
+              'language': 'id',
+              'autocomplete': 'true',
+              'proximity':
+                  '${_currentLocation.longitude},'
+                  '${_currentLocation.latitude}',
+              'limit': '5',
+            },
+          );
 
       try {
         final response = await http
@@ -250,41 +301,63 @@ class _MapScreenState extends State<MapScreen>
         if (response.statusCode == 200) {
           final decoded = jsonDecode(response.body);
 
+          final features =
+              decoded is Map<String, dynamic> && decoded['features'] is List
+              ? List<dynamic>.from(decoded['features'] as List)
+              : <dynamic>[];
+
           setState(() {
-            if (decoded is Map<String, dynamic> &&
-                decoded['features'] is List) {
-              _searchResults = List<dynamic>.from(decoded['features'] as List);
-            } else {
-              _searchResults = [];
-            }
-          });
-        } else {
-          setState(() {
-            _searchResults = [];
+            _searchResults = features;
+            _isSearchingLocation = false;
+            _searchError = features.isEmpty
+                ? 'Lokasi tidak ditemukan. Coba gunakan kata kunci lain.'
+                : null;
           });
 
-          debugPrint(
-            'Mapbox Geocoding gagal: '
-            '${response.statusCode} '
-            '${response.body}',
-          );
+          return;
         }
+
+        final errorMessage = switch (response.statusCode) {
+          401 =>
+            'Token Mapbox tidak valid atau sudah dicabut. '
+                'Periksa MAPBOX_ACCESS_TOKEN.',
+          403 =>
+            'Token Mapbox ditolak. Periksa scope dan URL restriction token.',
+          429 => 'Batas permintaan Mapbox tercapai. Coba lagi beberapa saat.',
+          _ =>
+            'Pencarian lokasi gagal '
+                '(HTTP ${response.statusCode}).',
+        };
+
+        setState(() {
+          _searchResults = [];
+          _isSearchingLocation = false;
+          _searchError = errorMessage;
+        });
+
+        debugPrint(
+          'Mapbox Geocoding gagal: '
+          '${response.statusCode} ${response.body}',
+        );
       } on TimeoutException {
         if (!mounted) return;
 
         setState(() {
           _searchResults = [];
+          _isSearchingLocation = false;
+          _searchError = 'Pencarian lokasi terlalu lama. Coba kembali.';
         });
-
-        _showMessage('Pencarian lokasi terlalu lama.', isError: true);
-      } catch (error) {
+      } catch (error, stackTrace) {
         if (!mounted) return;
 
         setState(() {
           _searchResults = [];
+          _isSearchingLocation = false;
+          _searchError = 'Terjadi kesalahan saat mencari lokasi.';
         });
 
         debugPrint('Error mencari lokasi: $error');
+        debugPrintStack(stackTrace: stackTrace);
       }
     });
   }
@@ -328,6 +401,10 @@ class _MapScreenState extends State<MapScreen>
       _destinationController.text = placeName.split(',').first;
 
       _searchResults = [];
+
+      _isSearchingLocation = false;
+
+      _searchError = null;
 
       // Hapus data rute sebelumnya.
       _routePoints = [];
@@ -432,6 +509,8 @@ class _MapScreenState extends State<MapScreen>
         _routeDurationMinutes = null;
         _routeError = null;
         _searchResults = [];
+        _isSearchingLocation = false;
+        _searchError = null;
         _isLoadingRoute = false;
         _isSavingRoute = false;
         _savedRouteId = routeId ?? -1;
@@ -676,6 +755,10 @@ class _MapScreenState extends State<MapScreen>
     setState(() {
       _searchResults = [];
 
+      _isSearchingLocation = false;
+
+      _searchError = null;
+
       _destinationLocation = null;
 
       _savedRouteStartLocation = null;
@@ -792,14 +875,19 @@ class _MapScreenState extends State<MapScreen>
                   ),
                   children: [
                     // TILE MAPBOX
-                    TileLayer(
-                      urlTemplate:
-                          'https://api.mapbox.com/styles/v1/'
-                          'mapbox/dark-v11/tiles/'
-                          '{z}/{x}/{y}'
-                          '?access_token={accessToken}',
-                      additionalOptions: {'accessToken': mapboxToken},
-                    ),
+                    //
+                    // Endpoint Static Tiles membutuhkan ukuran tile.
+                    // Ukuran 256 cocok langsung dengan flutter_map.
+                    if (_hasValidMapboxToken)
+                      TileLayer(
+                        urlTemplate:
+                            'https://api.mapbox.com/styles/v1/'
+                            'mapbox/dark-v11/tiles/256/'
+                            '{z}/{x}/{y}'
+                            '?access_token={accessToken}',
+                        additionalOptions: {'accessToken': mapboxToken.trim()},
+                        maxNativeZoom: 22,
+                      ),
 
                     // GARIS RUTE
                     if (_routePoints.isNotEmpty)
@@ -880,6 +968,67 @@ class _MapScreenState extends State<MapScreen>
               ),
 
               // =================================================
+              // PERINGATAN TOKEN MAPBOX
+              // =================================================
+              if (!_hasValidMapboxToken)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        width: 320,
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E1E),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: Colors.redAccent.withValues(alpha: 0.45),
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black45,
+                              blurRadius: 18,
+                              offset: Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.key_off_rounded,
+                              color: Colors.redAccent,
+                              size: 34,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              'Token Mapbox belum dimuat',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Text(
+                              'Jalankan Flutter menggunakan '
+                              '--dart-define-from-file=env.local.json.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // =================================================
               // TOP BAR DAN HASIL PENCARIAN
               // =================================================
               SafeArea(
@@ -957,63 +1106,129 @@ class _MapScreenState extends State<MapScreen>
                         ),
                       ),
 
-                      // HASIL PENCARIAN
-                      if (_searchResults.isNotEmpty)
+                      // HASIL PENCARIAN, LOADING, ATAU PESAN ERROR
+                      if (_isSearchingLocation ||
+                          _searchError != null ||
+                          _searchResults.isNotEmpty)
                         Container(
                           margin: const EdgeInsets.only(top: 10),
                           constraints: const BoxConstraints(maxHeight: 250),
                           decoration: BoxDecoration(
                             color: const Color(
                               0xFF1E1E1E,
-                            ).withValues(alpha: 0.95),
+                            ).withValues(alpha: 0.97),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: _searchError == null
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.redAccent.withValues(alpha: 0.35),
                             ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black38,
+                                blurRadius: 14,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
                           ),
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            itemCount: _searchResults.length,
-                            separatorBuilder: (context, index) => Divider(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              height: 1,
-                            ),
-                            itemBuilder: (context, index) {
-                              final feature = _searchResults[index];
-
-                              final title = feature is Map<String, dynamic>
-                                  ? feature['text']?.toString() ?? 'Lokasi'
-                                  : 'Lokasi';
-
-                              final subtitle = feature is Map<String, dynamic>
-                                  ? feature['place_name']?.toString() ?? ''
-                                  : '';
-
-                              return ListTile(
-                                leading: const Icon(
-                                  Icons.place_outlined,
-                                  color: Colors.white54,
-                                ),
-                                title: Text(
-                                  title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                          child: _isSearchingLocation
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 22),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: accentColor,
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Mencari lokasi...',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                subtitle: Text(
-                                  subtitle,
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 12,
+                                )
+                              : _searchError != null
+                              ? Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _searchError!,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: _searchResults.length,
+                                  separatorBuilder: (context, index) => Divider(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    height: 1,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final feature = _searchResults[index];
+
+                                    final title =
+                                        feature is Map<String, dynamic>
+                                        ? feature['text']?.toString() ??
+                                              'Lokasi'
+                                        : 'Lokasi';
+
+                                    final subtitle =
+                                        feature is Map<String, dynamic>
+                                        ? feature['place_name']?.toString() ??
+                                              ''
+                                        : '';
+
+                                    return ListTile(
+                                      leading: const Icon(
+                                        Icons.place_outlined,
+                                        color: Colors.white54,
+                                      ),
+                                      title: Text(
+                                        title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        subtitle,
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onTap: () => _selectDestination(feature),
+                                    );
+                                  },
                                 ),
-                                onTap: () => _selectDestination(feature),
-                              );
-                            },
-                          ),
                         ),
                     ],
                   ),

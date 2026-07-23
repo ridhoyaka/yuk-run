@@ -26,10 +26,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# VS Code (uncomment jika tidak ingin di-track)
-#.vscode/
+# VS Code
+# Biarkan tetap dapat di-commit jika launch.json tidak berisi token.
+# .vscode/
 
-# Flutter/Dart/Pub
+# Flutter / Dart / Pub
 **/doc/api/
 **/ios/Flutter/.last_build_id
 frontend/.dart_tool/
@@ -40,14 +41,25 @@ frontend/.pub/
 frontend/build/
 frontend/coverage/
 
-# Symbolication & Obfuscation
+# Symbolication dan obfuscation
 app.*.symbols
 app.*.map.json
 
 # Android build artifacts
-frontend/android/app/debug
-frontend/android/app/profile
-frontend/android/app/release
+frontend/android/app/debug/
+frontend/android/app/profile/
+frontend/android/app/release/
+
+# Environment lokal frontend
+frontend/env.local.json
+frontend/env.*.json
+frontend/.env
+frontend/.env.*
+frontend/*.env
+
+# File contoh frontend tetap boleh masuk Git
+!frontend/.env.example
+!frontend/env.example.json
 
 # ========================
 # BACKEND (Node.js)
@@ -56,10 +68,15 @@ frontend/android/app/release
 # Dependencies
 backend/node_modules/
 
-# Environment variables (JANGAN pernah di-commit!)
+# Environment variables
 backend/.env
-backend/.env.local
-backend/.env.*.local
+backend/.env.*
+backend/*.env
+backend/.env-backup
+backend/*.env-backup
+
+# File contoh backend tetap boleh masuk Git
+!backend/.env.example
 
 # Logs
 backend/logs/
@@ -82,11 +99,25 @@ backend/*.pid.lock
 backend/coverage/
 
 # Cache
-backend/.npm
+backend/.npm/
 backend/.eslintcache
 
 # ========================
-# UMUM
+# ENVIRONMENT ROOT
 # ========================
+
+.env
+.env.*
+*.env-backup
+.env-backup
+
+# File contoh root tetap boleh masuk Git
+!.env.example
+
+# ========================
+# SISTEM OPERASI
+# ========================
+
 .DS_Store
 Thumbs.db
+desktop.ini
