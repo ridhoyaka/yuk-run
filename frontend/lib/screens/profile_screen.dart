@@ -623,7 +623,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           child: Column(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
@@ -631,14 +631,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     width: 2,
                                   ),
                                 ),
-                                child: const CircleAvatar(
-                                  radius: 40,
-                                  backgroundColor: Color(0xFF2C2C2C),
-                                  child: Icon(
-                                    Icons.person_rounded,
-                                    size: 40,
-                                    color: accentColor,
+                                child: CircleAvatar(
+                                  radius: 44,
+                                  backgroundColor: const Color(0xFF2C2C2C),
+                                  backgroundImage: const AssetImage(
+                                    'assets/images/profil.jpeg',
                                   ),
+                                  // Fallback ikon jika gambar gagal load
+                                  onBackgroundImageError: (_, __) {},
                                 ),
                               ),
                               const SizedBox(height: 15),

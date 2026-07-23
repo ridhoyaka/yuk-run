@@ -110,7 +110,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 20),
+
+              // Hero Banner — gambar dashboard.jpeg
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    // Gambar
+                    SizedBox(
+                      width: double.infinity,
+                      height: 160,
+                      child: Image.asset(
+                        'assets/images/dashboard.jpeg',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
+                      ),
+                    ),
+                    // Overlay gradasi gelap agar teks terbaca
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.black.withValues(alpha: 0.6),
+                              Colors.transparent,
+                            ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Teks di atas gambar
+                    Positioned(
+                      bottom: 14,
+                      left: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Siap Berlari Hari Ini?',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Temukan rute terbaikmu sekarang',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
               // Card Rencanakan Jalur Lari
               Container(
