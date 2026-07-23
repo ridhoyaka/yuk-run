@@ -21,10 +21,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _durasiLabel = '0m';
   bool _statsLoading = true;
 
+  List<Map<String, dynamic>> _routes = [];
+  bool _routesLoading = true;
+
   @override
   void initState() {
     super.initState();
     _fetchWeeklyStats();
+    _fetchRoutes();
   }
 
   Future<void> _fetchWeeklyStats() async {
@@ -52,6 +56,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _statsLoading = false);
+    }
+  }
+
+  Future<void> _fetchRoutes() async {
+    if (mounted) setState(() => _routesLoading = true);
+    try {
+      final token = await _storage.read(key: 'jwt_token');
+      if (token == null) return;
+
+      final response = await http
+          .get(
+            Uri.parse('${ApiService.baseUrl}/routes'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _routes = List<Map<String, dynamic>>.from(data['data'] ?? []);
+          _routesLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _routesLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _routesLoading = false);
     }
   }
 
@@ -102,10 +133,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0x1FFFFFFF)),
                     ),
-                    child: const Icon(
-                      Icons.notifications_outlined,
-                      color: Colors.white,
-                      size: 22,
+                    child: GestureDetector(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(
+                                  Icons.notifications_active_rounded,
+                                  color: Colors.black,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Tidak ada notifikasi baru',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: const Color(0xFF00FF66),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Icon(
+                        Icons.notifications_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
@@ -370,21 +432,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 10),
 
-              _buildFavoriteRouteCard(
-                context,
-                'Loop Stadion GBK',
-                '4.2 km • Senayan',
-                Icons.directions_run,
-                accentColor,
-              ),
-              const SizedBox(height: 12),
-              _buildFavoriteRouteCard(
-                context,
-                'Jalur Hijau Sudirman',
-                '6.8 km • Sudirman',
-                Icons.park_rounded,
-                accentColor,
-              ),
+              // Data rute real dari database
+              if (_routesLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: CircularProgressIndicator(
+                      color: accentColor,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              else if (_routes.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.route_rounded,
+                        color: Colors.white.withValues(alpha: 0.15),
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Belum ada rute tersimpan',
+                        style: TextStyle(color: Colors.white38, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => _navigateToTab(context, 1),
+                        child: Text(
+                          'Buat rute pertamamu →',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ...List.generate(_routes.length > 3 ? 3 : _routes.length, (i) {
+                  final route = _routes[i];
+                  final start = route['nama_lokasi_start'] as String? ?? '-';
+                  final finish = route['nama_lokasi_finish'] as String? ?? '-';
+                  final jarak =
+                      (route['total_jarak_km'] as num?)?.toDouble() ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildFavoriteRouteCard(
+                      context,
+                      '$start → $finish',
+                      '${jarak.toStringAsFixed(1)} km',
+                      Icons.directions_run_rounded,
+                      accentColor,
+                    ),
+                  );
+                }),
               const SizedBox(height: 12),
             ],
           ),

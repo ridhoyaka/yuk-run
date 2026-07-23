@@ -602,108 +602,143 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                         const SizedBox(height: 20),
-                        // Kartu profil
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF1E1E1E),
-                                accentColor.withValues(alpha: 0.1),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                        // Kartu profil dengan background gambar profil.jpeg
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: accentColor.withValues(alpha: 0.2),
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: accentColor.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: accentColor,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: CircleAvatar(
-                                  radius: 44,
-                                  backgroundColor: const Color(0xFF2C2C2C),
-                                  backgroundImage: const AssetImage(
+                            child: Stack(
+                              children: [
+                                // Background gambar
+                                Positioned.fill(
+                                  child: Image.asset(
                                     'assets/images/profil.jpeg',
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.center,
                                   ),
-                                  // Fallback ikon jika gambar gagal load
-                                  onBackgroundImageError: (_, __) {},
                                 ),
-                              ),
-                              const SizedBox(height: 15),
-                              Text(
-                                widget.userName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _userEmail.isNotEmpty
-                                    ? _userEmail
-                                    : 'runnotpace@app.com',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _statsLoading
-                                  ? const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 8,
+                                // Overlay gelap
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.black.withValues(alpha: 0.78),
+                                          Colors.black.withValues(alpha: 0.52),
+                                        ],
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
                                       ),
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Color(0xFF00FF66),
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    )
-                                  : Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                        _buildProfileStat(
-                                          'Jarak Total',
-                                          '${_totalJarak.toStringAsFixed(1)} km',
-                                        ),
-                                        Container(
-                                          width: 1,
-                                          height: 25,
-                                          color: Colors.white12,
-                                        ),
-                                        _buildProfileStat(
-                                          'Sesi Lari',
-                                          '$_totalSesi Sesi',
-                                        ),
-                                        Container(
-                                          width: 1,
-                                          height: 25,
-                                          color: Colors.white12,
-                                        ),
-                                        _buildProfileStat(
-                                          'Pencapaian',
-                                          '$_totalPencapaian Event',
-                                        ),
-                                      ],
                                     ),
-                            ],
+                                  ),
+                                ),
+                                // Konten kartu
+                                Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    children: [
+                                      // Avatar huruf pertama nama
+                                      Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: accentColor,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 40,
+                                          backgroundColor: const Color(
+                                            0xFF1E1E1E,
+                                          ),
+                                          child: Text(
+                                            widget.userName.isNotEmpty
+                                                ? widget.userName[0]
+                                                      .toUpperCase()
+                                                : '?',
+                                            style: TextStyle(
+                                              color: accentColor,
+                                              fontSize: 30,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 15),
+                                      Text(
+                                        widget.userName,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _userEmail.isNotEmpty
+                                            ? _userEmail
+                                            : 'runnotpace@app.com',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      _statsLoading
+                                          ? const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                vertical: 8,
+                                              ),
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Color(0xFF00FF66),
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
+                                            )
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceAround,
+                                              children: [
+                                                _buildProfileStat(
+                                                  'Jarak Total',
+                                                  '${_totalJarak.toStringAsFixed(1)} km',
+                                                ),
+                                                Container(
+                                                  width: 1,
+                                                  height: 25,
+                                                  color: Colors.white24,
+                                                ),
+                                                _buildProfileStat(
+                                                  'Sesi Lari',
+                                                  '$_totalSesi Sesi',
+                                                ),
+                                                Container(
+                                                  width: 1,
+                                                  height: 25,
+                                                  color: Colors.white24,
+                                                ),
+                                                _buildProfileStat(
+                                                  'Pencapaian',
+                                                  '$_totalPencapaian Event',
+                                                ),
+                                              ],
+                                            ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 25),

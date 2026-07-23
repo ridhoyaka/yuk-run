@@ -254,6 +254,25 @@ app.post('/api/routes', verifyToken, async (req, res) => {
     }
 });
 
+// GET — Ambil daftar rute favorit milik user
+app.get('/api/routes', verifyToken, async (req, res) => {
+    const id_user = req.user.id_user;
+
+    try {
+        const result = await db.query(
+            `SELECT id_rute, nama_lokasi_start, nama_lokasi_finish, total_jarak_km, created_at
+             FROM tabel_routes
+             WHERE id_user = $1
+             ORDER BY created_at DESC`,
+            [id_user]
+        );
+        res.json({ message: 'Berhasil mengambil rute favorit', data: result.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Gagal mengambil rute favorit.' });
+    }
+});
+
 // ==========================================
 // ENDPOINT JURNAL LARI (RUN LOGS)
 // ==========================================
@@ -285,14 +304,34 @@ app.get('/api/logs', verifyToken, async (req, res) => {
 
     try {
         const logs = await db.query(
-            `SELECT l.*, r.nama_lokasi_start, r.nama_lokasi_finish, r.total_jarak_km
+            `SELECT l.id_log, l.durasi_menit, l.catatan_kondisi, l.tanggal_latihan,
+                    r.nama_lokasi_start, r.nama_lokasi_finish, r.total_jarak_km
              FROM tabel_run_logs l
              JOIN tabel_routes r ON l.id_rute = r.id_rute
              WHERE l.id_user = $1
              ORDER BY l.tanggal_latihan DESC`,
             [id_user]
         );
-        res.json({ message: 'Berhasil mengambil riwayat lari', data: logs.rows });
+
+        // Hitung summary total
+        const summary = await db.query(
+            `SELECT 
+                COUNT(l.id_log) AS total_sesi,
+                COALESCE(SUM(r.total_jarak_km), 0) AS total_jarak
+             FROM tabel_run_logs l
+             JOIN tabel_routes r ON l.id_rute = r.id_rute
+             WHERE l.id_user = $1`,
+            [id_user]
+        );
+
+        res.json({
+            message: 'Berhasil mengambil riwayat lari',
+            data: logs.rows,
+            summary: {
+                total_sesi: parseInt(summary.rows[0].total_sesi) || 0,
+                total_jarak_km: parseFloat(summary.rows[0].total_jarak) || 0,
+            },
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil riwayat lari.' });
