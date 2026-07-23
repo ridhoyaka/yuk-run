@@ -11,6 +11,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'RunNotPace',
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -20,3 +21,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+//192.168.1.12
