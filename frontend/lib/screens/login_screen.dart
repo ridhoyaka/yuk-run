@@ -273,39 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: HoverButton(
-                              builder: (context, progress) => TextButton(
-                                onPressed: () {},
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Color.lerp(
-                                    Colors.white54,
-                                    Colors.white,
-                                    progress,
-                                  ),
-                                  backgroundColor: Colors.transparent,
-                                  side: progress > 0.01
-                                      ? BorderSide(
-                                          color: Colors.white.withValues(
-                                            alpha: progress,
-                                          ),
-                                          width: 2.0,
-                                        )
-                                      : null,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Lupa Password?',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
