@@ -1328,10 +1328,12 @@ app.use((error, req, res, next) => {
 // ==========================================
 // MENYALAKAN SERVER
 // ==========================================
-app.listen(port, () => {
-  console.log(`🚀 Server RunNotPace berjalan di http://localhost:${port}`);
+const PORT = process.env.PORT || 3000;
 
-  console.log(`🧭 Timeout Mapbox: ${MAPBOX_TIMEOUT_MS / 1000} detik`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server RunNotPace berjalan di http://localhost:${PORT}`);
 
-  console.log(`📦 Batas request body: ${REQUEST_BODY_LIMIT}`);
+    console.log(`🧭 Timeout Mapbox: ${MAPBOX_TIMEOUT_MS / 1000} detik`);
+
+    console.log(`📦 Batas request body: ${REQUEST_BODY_LIMIT}`);
 });
