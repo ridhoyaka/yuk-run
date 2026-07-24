@@ -59,7 +59,7 @@ class _NewsScreenState extends State<NewsScreen>
     });
 
     // Kirim index kategori ke backend, query ditentukan di sisi server
-    const apiBase = 'http://localhost:3000/api';
+    const apiBase = 'https://yuk-run-production.up.railway.app/api';
     final url = '$apiBase/news?category=$_selectedCategory';
 
     try {
